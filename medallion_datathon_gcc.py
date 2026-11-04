@@ -96,7 +96,10 @@ def to_spark(pdf: pd.DataFrame):
     """pandas -> Spark con esquema explícito; NaN se escribe como NULL real."""
     schema = StructType([StructField(str(c), _spark_type(t), True) for c, t in pdf.dtypes.items()])
     clean = pdf.astype(object).where(pdf.notna(), None)
-    return spark.createDataFrame(clean.values.tolist(), schema)
+    # Spark no acepta pd.Timestamp: se convierte a datetime nativo de Python
+    records = [[v.to_pydatetime() if isinstance(v, pd.Timestamp) else v for v in row]
+               for row in clean.values.tolist()]
+    return spark.createDataFrame(records, schema)
 
 def save_table(pdf: pd.DataFrame, table: str):
     (to_spark(pdf).write.format("delta").mode("overwrite")
